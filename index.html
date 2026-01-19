@@ -21,6 +21,7 @@
         .btn-danger { background: #ff4444; color: #fff; padding: 5px 10px; font-size: 10px; position: absolute; top: 10px; right: 10px; border-radius: 3px; }
         label { color: #888; font-size: 10px; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1.5px; }
         h2 { margin-top: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 20px; letter-spacing: 1px; }
+        
         #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
         #setup-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; display: flex; align-items: center; justify-content: center; }
         .overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.95); }
@@ -29,7 +30,8 @@
         .toggle-pass { position: absolute; right: 10px; bottom: 8px; cursor: pointer; font-size: 10px; color: var(--neon); background: #333; border: 1px solid #444; padding: 4px 8px; border-radius: 3px; }
         .status-toast { background: rgba(0, 255, 65, 0.1); border: 1px solid var(--neon); padding: 12px; margin-bottom: 20px; border-radius: 8px; font-size: 13px; text-align: center; }
         .hidden { display: none !important; }
-        .err-text { color: #ff4444 !important; font-weight: bold; }
+        .err-text { color: #ff4444 !important; }
+        .build-info { text-align: center; font-size: 9px; color: #333; margin-top: 40px; text-transform: uppercase; letter-spacing: 2px; }
     </style>
 </head>
 <body>
@@ -38,8 +40,8 @@
     <div class="overlay"></div>
     <div class="modal">
         <h2 style="color:var(--neon)">🚀 FIRST RUN</h2>
-        <p style="font-size:12px; color:#ccc;">Set an app key or leave blank for none.</p>
-        <input type="text" id="new-pwa-pass" placeholder="New Password..." style="margin-bottom:15px; text-align: center;">
+        <p style="font-size:12px; color:#ccc;">The default key is <b>admin123</b>.</p>
+        <input type="text" id="new-pwa-pass" placeholder="Set Custom Password..." style="margin-bottom:15px; text-align: center;">
         <button class="btn-upload" onclick="finalizeSetup()">INITIALIZE</button>
     </div>
 </div>
@@ -79,33 +81,29 @@
             <button class="btn-upload" style="margin-top:0;" onclick="uploadFile()">🚀 PUSH TO DEVICE</button>
         </div>
     </div>
+
+    <div class="build-info">BUILD_WORD: NEBULA</div>
 </div>
 
 <script>
-    const WIFI_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74];
+    const WIFI_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74]; // "CrossPoint"
     let idleTimer;
     const IDLE_TIMEOUT = 5 * 60 * 1000;
 
     function print(msg, isError = false) {
         const t = document.getElementById('terminal');
-        const span = isError ? `<span class="err-text">> ${msg}</span>` : `> ${msg}`;
-        t.innerHTML += `${span}<br>`;
+        const content = isError ? `<span class="err-text">> ERROR: ${msg}</span>` : `> ${msg}`;
+        t.innerHTML += `${content}<br>`;
         t.scrollTop = t.scrollHeight;
     }
 
     // --- PERSISTENCE ---
     function saveWifiToLocal() {
-        const rows = document.querySelectorAll('.wifi-node');
-        if (rows.length === 0) {
-            localStorage.removeItem('cached_wifi_bin');
-            return;
-        }
         const blob = exportWifi(false);
         const reader = new FileReader();
         reader.onload = function() {
             const base64 = reader.result.split(',')[1];
             localStorage.setItem('cached_wifi_bin', base64);
-            console.log("Auto-saved to LocalStorage");
         };
         reader.readAsDataURL(blob);
     }
@@ -113,7 +111,7 @@
     async function loadWifiFromLocal() {
         const cachedData = localStorage.getItem('cached_wifi_bin');
         if (!cachedData) {
-            print("STORAGE_EMPTY: No profiles found in memory.", true);
+            print("STORAGE_EMPTY: Ready for new data.");
             return;
         }
         try {
@@ -124,10 +122,10 @@
             if (parseWifiBinary(bytes)) {
                 document.getElementById('load-msg').classList.remove('hidden');
                 setTimeout(() => document.getElementById('load-msg').classList.add('hidden'), 4000);
-                print("RESTORED: Profiles loaded from browser storage.");
+                print("RESTORED: Previous session data loaded.");
             }
         } catch (e) {
-            print("ERROR: Could not parse stored data.", true);
+            print("RESTORE_FAILED: Storage corrupted.", true);
         }
     }
 
@@ -150,7 +148,7 @@
 
     function checkSecurity() {
         const savedPass = localStorage.getItem('pwa_pass_key');
-        if (!savedPass) unlockSuccess();
+        if (savedPass === "" || savedPass === null) unlockSuccess();
         else document.getElementById('lock-screen').classList.remove('hidden');
     }
 
@@ -158,7 +156,7 @@
         const input = document.getElementById('pwa-pass').value;
         const savedPass = localStorage.getItem('pwa_pass_key') || "admin123";
         if (input === savedPass) unlockSuccess();
-        else { print("INVALID_KEY: Access denied.", true); alert("DENIED"); }
+        else { print("ACCESS_DENIED", true); alert("DENIED"); }
     }
 
     function unlockSuccess() {
@@ -172,65 +170,15 @@
         clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
             document.getElementById('lock-screen').classList.remove('hidden');
-            print("SESSION_EXPIRED: Locked for security.");
+            print("SESSION_EXPIRED: UI Locked.");
         }, IDLE_TIMEOUT);
     }
 
-    // --- WIFI LOGIC ---
+    // --- WIFI PARSING & LOGIC ---
     function toggleVisibility(btn, inputId) {
         const input = document.getElementById(inputId);
         input.type = (input.type === "password") ? "text" : "password";
         btn.innerText = (input.type === "password") ? "SHOW" : "HIDE";
     }
 
-    function addNewWifi(s, p) {
-        const id = "pass_" + Math.random().toString(36).substr(2, 9);
-        const div = document.createElement('div');
-        div.className = 'wifi-node';
-        div.innerHTML = `
-            <button class="btn-danger" onclick="this.parentElement.remove(); saveWifiToLocal();">REMOVE</button>
-            <div><label>Network SSID</label><input type="text" class="ssid" oninput="saveWifiToLocal()" value="${s}"></div>
-            <div class="pass-container">
-                <label>Password</label>
-                <input type="password" id="${id}" class="pass" oninput="saveWifiToLocal()" value="${p}">
-                <button class="toggle-pass" onclick="toggleVisibility(this, '${id}')">SHOW</button>
-            </div>`;
-        document.getElementById('entryList').appendChild(div);
-        saveWifiToLocal();
-    }
-
-    async function readWifiFile() {
-        const file = document.getElementById('wifiIn').files[0];
-        if (!file) return;
-        const data = new Uint8Array(await file.arrayBuffer());
-        if (parseWifiBinary(data)) {
-            print(`SUCCESS: Imported ${file.name}`);
-            saveWifiToLocal(); 
-        }
-    }
-
-    function parseWifiBinary(data) {
-        if (data.length < 2 || data[0] !== 1) { 
-            print("ERROR: Invalid wifi.bin header.", true); 
-            return false; 
-        }
-        document.getElementById('entryList').innerHTML = '';
-        let ptr = 2; 
-        try {
-            for (let i = 0; i < data[1]; i++) {
-                const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-                const ssid = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + sLen));
-                ptr += 4 + sLen;
-                const pLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-                const pass = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + pLen).map((b, j) => b ^ WIFI_KEY[j % 10]));
-                ptr += 4 + pLen;
-                addNewWifi(ssid, pass);
-            }
-            return true;
-        } catch (err) {
-            print("ERROR: Binary structure mismatch.", true);
-            return false;
-        }
-    }
-
-    function exportWifi(
+    function addNewWifi(ssid, pass) {
