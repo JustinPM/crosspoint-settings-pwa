@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CrossPoint | WiFi Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         :root {
             --bg: #f5f5f7;
@@ -28,7 +29,13 @@
         .card { background: var(--surface); border: 1px solid var(--border); padding: 24px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
         h2 { margin-top: 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.2px; border-bottom: 1px solid #f2f2f2; padding-bottom: 10px; margin-bottom: 20px; }
 
-        .log-stream { background: #1a1a1a; color: #00ff41; padding: 12px; font-size: 11px; height: 80px; overflow-y: auto; border-radius: 6px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; line-height: 1.5; }
+        .log-stream { background: #1a1a1a; color: #00ff41; padding: 12px; font-size: 11px; height: 80px; overflow-y: auto; border-radius: 6px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+
+        /* Scanner Styling */
+        #scanner-container { display: none; margin-bottom: 20px; position: relative; border-radius: 8px; overflow: hidden; background: #000; }
+        #preview { width: 100%; border-radius: 8px; }
+        .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 65, 0.5); box-shadow: 0 0 10px #00ff41; animation: scan 2s infinite; }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
 
         .wifi-node { 
             background: #fff; border: 1px solid var(--border); padding: 15px; margin-bottom: 12px; 
@@ -41,6 +48,7 @@
         .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
         button { cursor: pointer; padding: 12px; border: 1px solid var(--accent); border-radius: 6px; font-weight: 700; font-size: 12px; transition: all 0.2s; }
         .btn-add { background: #fff; color: var(--accent); border-style: dashed; flex: 1; }
+        .btn-scan { background: #fff; color: var(--accent); border-style: solid; border-width: 2px; }
         .btn-upload { background: var(--accent); color: #fff; flex: 2; }
         .btn-download { background: #fff; color: var(--accent); flex: 1; }
         .btn-danger-sm { color: var(--danger); border-color: #ffb3b0; background: #fff; font-size: 10px; padding: 4px 8px; }
@@ -73,6 +81,12 @@
     <div class="card">
         <h2>🌐 WiFi Profiles</h2>
         
+        <div id="scanner-container">
+            <video id="preview"></video>
+            <div class="scan-line"></div>
+            <button onclick="stopScanner()" style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.8);">CANCEL</button>
+        </div>
+
         <div style="margin-bottom: 20px;">
             <label>Load existing wifi.bin</label>
             <input type="file" id="wifiIn" onchange="readWifiFile()" style="font-size: 11px;">
@@ -80,7 +94,10 @@
 
         <div id="entryList"></div>
 
-        <button class="btn-add" onclick="addNewWifi('', '')" style="margin-bottom: 15px;">+ ADD NEW NETWORK</button>
+        <div class="btn-group" style="margin-bottom: 15px;">
+            <button class="btn-scan" onclick="startScanner()">📷 SCAN QR</button>
+            <button class="btn-add" onclick="addNewWifi('', '')">+ ADD MANUALLY</button>
+        </div>
 
         <div class="btn-group">
             <button class="btn-download" onclick="exportWifi(true)">SAVE .BIN</button>
@@ -91,130 +108,63 @@
 
 <script>
     const WIFI_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74];
+    let videoStream = null;
 
     function log(msg) {
         const t = document.getElementById('terminal');
         t.innerText = `> ${msg}\n` + t.innerText;
     }
 
-    function saveCache() {
-        const data = Array.from(document.querySelectorAll('.wifi-node')).map(row => ({
-            s: row.querySelector('.ssid').value,
-            p: row.querySelector('.pass').value
-        }));
-        localStorage.setItem('cp_wifi_cache', JSON.stringify(data));
-    }
-
-    function clearAllData() {
-        if(confirm("Wipe all networks?")) {
-            localStorage.removeItem('cp_wifi_cache');
-            document.getElementById('entryList').innerHTML = '';
-            log("CACHE_CLEARED");
-        }
-    }
-
-    async function readWifiFile() {
-        const file = document.getElementById('wifiIn').files[0];
-        if (!file) return;
-
-        const buffer = await file.arrayBuffer();
-        const data = new Uint8Array(buffer);
-        
-        // Header check: Version (byte 0) and Count (byte 1)
-        if (data.length < 2) { log("ERR: File too small"); return; }
-        const version = data[0];
-        const count = data[1];
-        
-        log(`Parsing ${count} networks (Ver: ${version})...`);
-        document.getElementById('entryList').innerHTML = '';
-        
-        let ptr = 2;
+    // --- SCANNER LOGIC ---
+    async function startScanner() {
+        const video = document.getElementById('preview');
+        const container = document.getElementById('scanner-container');
         try {
-            for (let i = 0; i < count; i++) {
-                // SSID
-                const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-                ptr += 4;
-                const ssid = new TextDecoder().decode(data.slice(ptr, ptr + sLen));
-                ptr += sLen;
-
-                // Password
-                const pLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-                ptr += 4;
-                const pEncoded = data.slice(ptr, ptr + pLen);
-                const pass = new TextDecoder().decode(pEncoded.map((b, j) => b ^ WIFI_KEY[j % 10]));
-                ptr += pLen;
-
-                addNewWifi(ssid, pass);
-            }
-            log("IMPORT_SUCCESS");
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = videoStream;
+            video.setAttribute("playsinline", true); 
+            video.play();
+            container.style.display = 'block';
+            requestAnimationFrame(tick);
         } catch (e) {
-            log("ERR: Data corruption or invalid format.");
+            log("CAMERA_ERROR: Access denied or not found.");
         }
     }
 
-    function addNewWifi(s, p) {
-        const id = "pass_" + Math.random().toString(36).substr(2, 5);
-        const div = document.createElement('div');
-        div.className = 'wifi-node';
-        div.innerHTML = `
-            <div><label>SSID</label><input type="text" class="ssid" value="${s}" oninput="saveCache()"></div>
-            <div><label>Pass</label><input type="password" id="${id}" class="pass" value="${p}" oninput="saveCache()"></div>
-            <button class="btn-toggle" onclick="toggle('${id}', this)">SHOW</button>
-            <button class="btn-danger-sm" style="border:none; color:#000;" onclick="this.parentElement.remove(); saveCache();">✕</button>`;
-        document.getElementById('entryList').appendChild(div);
-        saveCache();
-    }
-
-    function toggle(id, btn) {
-        const input = document.getElementById(id);
-        input.type = input.type === "password" ? "text" : "password";
-        btn.innerText = input.type === "password" ? "SHOW" : "HIDE";
-    }
-
-    function exportWifi(dl) {
-        const rows = document.querySelectorAll('.wifi-node');
-        const out = [1, rows.length]; // Version 1, Count
-
-        rows.forEach(row => {
-            const s = new TextEncoder().encode(row.querySelector('.ssid').value);
-            const p = new TextEncoder().encode(row.querySelector('.pass').value);
-
-            // SSID: 4-byte little-endian length + data
-            const sLen = s.length;
-            out.push(sLen & 0xff, (sLen >> 8) & 0xff, (sLen >> 16) & 0xff, (sLen >> 24) & 0xff);
-            s.forEach(b => out.push(b));
-
-            // Pass: 4-byte little-endian length + xor data
-            const pLen = p.length;
-            out.push(pLen & 0xff, (pLen >> 8) & 0xff, (pLen >> 16) & 0xff, (pLen >> 24) & 0xff);
-            p.forEach((b, i) => out.push(b ^ WIFI_KEY[i % 10]));
-        });
-
-        const blob = new Blob([new Uint8Array(out)], { type: 'application/octet-stream' });
-        if (dl) {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'wifi.bin';
-            a.click();
+    function stopScanner() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(t => t.stop());
+            videoStream = null;
         }
-        return blob;
+        document.getElementById('scanner-container').style.display = 'none';
     }
 
-    async function uploadFile() {
-        const host = document.getElementById('deviceIP').value;
-        const formData = new FormData();
-        formData.append('file', exportWifi(false), 'wifi.bin');
-        log(`PUSH: ${host}`);
-        try {
-            await fetch(`http://${host}/upload?path=/.crosspoint/`, { method: 'POST', body: formData, mode: 'no-cors' });
-            log("PUSH_COMPLETE");
-        } catch (e) { log("ERR: Unreachable"); }
+    function tick() {
+        const video = document.getElementById('preview');
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const canvas = document.createElement("canvas");
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+            
+            if (code) {
+                parseWiFiQR(code.data);
+                stopScanner();
+                return;
+            }
+        }
+        if (videoStream) requestAnimationFrame(tick);
     }
 
-    window.onload = () => {
-        const cache = localStorage.getItem('cp_wifi_cache');
-        if (cache) JSON.parse(cache).forEach(item => addNewWifi(item.s, item.p));
-    };
-</script>
-</body>
-</html>
+    function parseWiFiQR(data) {
+        // WIFI:S:MyNetwork;T:WPA;P:MyPassword;;
+        const ssidMatch = data.match(/S:([^;]+);/);
+        const passMatch = data.match(/P:([^;]+);/);
+        if (ssidMatch) {
+            addNewWifi(ssidMatch[1], passMatch ? passMatch[1] : "");
+            log(`QR_FOUND: ${ssidMatch[1]}`);
+        } else {
+            log("INVALID_QR
