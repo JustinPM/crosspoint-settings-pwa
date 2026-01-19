@@ -98,117 +98,78 @@
 </div>
 
 <script>
-    const WIFI_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74];
+const WIFI_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74];
 
-    function print(msg) {
-        const t = document.getElementById('terminal');
-        if(t) {
-            t.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
-            t.scrollTop = t.scrollHeight;
-        }
-    }
+// --- LOCAL STORAGE LOGIC ---
 
-    async function readSettingsFile() {
-        try {
-            const file = document.getElementById('setIn').files[0];
-            if (!file) return;
-            const data = new Uint8Array(await file.arrayBuffer());
-            let ptr = 0;
-            const version = data[ptr++];
-            const count = data[ptr++];
-            print(`Settings: Version ${version}, Count ${count}`);
-            for(let i=0; i<15; i++) { if (ptr < data.length) document.getElementById(`field_${i}`).value = data[ptr++]; }
-            const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-            ptr += 4;
-            document.getElementById('field_url').value = new TextDecoder().decode(data.slice(ptr, ptr + sLen));
-            ptr += sLen;
-            for(let i=15; i<18; i++) { if (ptr < data.length) document.getElementById(`field_${i}`).value = data[ptr++]; }
-        } catch(e) { print("Error reading settings file."); }
-    }
+// Saves the current WiFi list to the browser's memory
+function saveWifiToLocal() {
+    const blob = exportWifi(false); // Get the binary blob
+    const reader = new FileReader();
+    reader.onload = function() {
+        const base64data = reader.result.split(',')[1];
+        localStorage.setItem('cached_wifi_bin', base64data);
+        print("SYSTEM: WiFi profiles saved to local storage.");
+    };
+    reader.readAsDataURL(blob);
+}
 
-    function exportSettings(dl) {
-        const out = [1, 18]; 
-        for(let i=0; i<15; i++) out.push(parseInt(document.getElementById(`field_${i}`).value));
-        const url = document.getElementById('field_url').value;
-        const sBuf = new TextEncoder().encode(url);
-        [sBuf.length, 0, 0, 0].forEach(b => out.push(b));
-        sBuf.forEach(b => out.push(b));
-        for(let i=15; i<18; i++) out.push(parseInt(document.getElementById(`field_${i}`).value));
-        const blob = new Blob([new Uint8Array(out)], { type: 'application/octet-stream' });
-        if (dl) triggerDownload(blob, 'settings.bin');
-        return blob;
-    }
+// Loads the WiFi list from memory on startup
+async function loadWifiFromLocal() {
+    const cachedData = localStorage.getItem('cached_wifi_bin');
+    if (!cachedData) return;
 
-    async function readWifiFile() {
-        try {
-            const file = document.getElementById('wifiIn').files[0];
-            if (!file) return;
-            const data = new Uint8Array(await file.arrayBuffer());
-            document.getElementById('entryList').innerHTML = '';
-            let ptr = 2; 
-            for (let i = 0; i < data[1]; i++) {
-                const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-                const ssid = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + sLen));
-                ptr += 4 + sLen;
-                const pLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-                const pass = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + pLen).map((b, j) => b ^ WIFI_KEY[j % 10]));
-                ptr += 4 + pLen;
-                addNewWifi(ssid, pass);
-            }
-        } catch(e) { print("Error reading wifi file."); }
+    // Convert Base64 back to Uint8Array
+    const binaryString = atob(cachedData);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
     }
+    
+    parseWifiBinary(bytes);
+    print("SYSTEM: Restored WiFi profiles from memory.");
+}
 
-    function addNewWifi(s, p) {
-        const div = document.createElement('div');
-        div.className = 'wifi-node';
-        div.innerHTML = `<div><label>SSID</label><input type="text" class="ssid" value="${s}"></div>
-                         <div><label>PASS</label><input type="text" class="pass" value="${p}"></div>
-                         <button class="btn-danger" onclick="this.parentElement.remove()">X</button>`;
-        document.getElementById('entryList').appendChild(div);
-    }
+// --- MODIFIED WIFI LOGIC ---
 
-    function exportWifi(dl) {
-        const rows = document.querySelectorAll('.wifi-node');
-        const out = [1, rows.length];
-        rows.forEach(row => {
-            const s = new TextEncoder().encode(row.querySelector('.ssid').value);
-            const p = new TextEncoder().encode(row.querySelector('.pass').value);
-            [s.length, 0, 0, 0].forEach(b => out.push(b)); s.forEach(b => out.push(b));
-            [p.length, 0, 0, 0].forEach(b => out.push(b)); p.forEach((b, i) => out.push(b ^ WIFI_KEY[i % 10]));
-        });
-        const blob = new Blob([new Uint8Array(out)], { type: 'application/octet-stream' });
-        if (dl) triggerDownload(blob, 'wifi.bin');
-        return blob;
-    }
+async function readWifiFile() {
+    const file = document.getElementById('wifiIn').files[0];
+    if (!file) return;
+    const data = new Uint8Array(await file.arrayBuffer());
+    parseWifiBinary(data);
+    saveWifiToLocal(); // Save after importing a file
+}
 
-    function triggerDownload(blob, name) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = name; a.click();
+function parseWifiBinary(data) {
+    document.getElementById('entryList').innerHTML = '';
+    let ptr = 2; 
+    for (let i = 0; i < data[1]; i++) {
+        const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
+        const ssid = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + sLen));
+        ptr += 4 + sLen;
+        const pLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
+        const pass = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + pLen).map((b, j) => b ^ WIFI_KEY[j % 10]));
+        ptr += 4 + pLen;
+        addNewWifi(ssid, pass);
     }
+}
 
-    async function uploadFile(type) {
-        const host = document.getElementById('deviceIP').value;
-        const blob = (type === 'wifi') ? exportWifi(false) : exportSettings(false);
-        const fileName = (type === 'wifi') ? 'wifi.bin' : 'settings.bin';
-        const formData = new FormData();
-        formData.append('file', blob, fileName);
-        const url = `http://${host}/upload?path=/.crosspoint/`;
-        print(`UPLOADING ${fileName} to ${host}...`);
-        try {
-            await fetch(url, { method: 'POST', body: formData, mode: 'no-cors' });
-            print(`TRANSMITTED: Check device.`);
-        } catch (err) { print(`ERROR: Request failed.`); }
-    }
+function addNewWifi(s, p) {
+    const div = document.createElement('div');
+    div.className = 'wifi-node';
+    div.innerHTML = `<div><label>SSID</label><input type="text" class="ssid" oninput="saveWifiToLocal()" value="${s}"></div>
+                     <div><label>PASS</label><input type="text" class="pass" oninput="saveWifiToLocal()" value="${p}"></div>
+                     <button class="btn-danger" onclick="this.parentElement.remove(); saveWifiToLocal();">X</button>`;
+    document.getElementById('entryList').appendChild(div);
+}
 
-    // PWA Logic: Registers the Service Worker to make it installable
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(() => console.log("Service Worker Registered"))
-                .catch(err => console.error("Service Worker Failed", err));
-        });
-    }
+// Initialize on page load
+window.addEventListener('DOMContentLoaded', () => {
+    loadWifiFromLocal();
+});
+
+// ... Keep existing exportWifi, uploadFile, and triggerDownload functions ...
 </script>
 </body>
 </html>
