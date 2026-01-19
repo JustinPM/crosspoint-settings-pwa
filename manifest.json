@@ -1,5 +1,5 @@
 {
-  "name": "CrossPoint Remote",
+  "name": "CrossPoint Manager",
   "short_name": "CrossPoint",
   "start_url": "index.html",
   "display": "standalone",
@@ -7,12 +7,13 @@
   "theme_color": "#00ff41",
   "icons": [
     {
-      "src": "https://placehold.jp/192x192.png",
+      "src": "https://placehold.jp/24/0d0d0d/00ff41/192x192.png?text=CP",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "https://placehold.jp/512x512.png",
+      "src": "https://placehold.jp/48/0d0d0d/00ff41/512x512.png?text=CrossPoint",
       "sizes": "512x512",
       "type": "image/png"
     }
