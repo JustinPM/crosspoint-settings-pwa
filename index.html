@@ -11,7 +11,7 @@
         body { font-family: 'Consolas', monospace; background: var(--bg); color: var(--neon); padding: 20px; line-height: 1.4; margin: 0; }
         .container { max-width: 600px; margin: 0 auto; }
         .card { background: var(--card); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 20px; }
-        .log-stream { background: #000; color: #008f11; padding: 12px; font-size: 11px; height: 80px; overflow-y: auto; border: 1px solid #222; margin-bottom: 20px; border-radius: 4px; }
+        .log-stream { background: #000; color: #008f11; padding: 12px; font-size: 11px; height: 100px; overflow-y: auto; border: 1px solid #222; margin-bottom: 20px; border-radius: 4px; border-left: 3px solid #444; }
         .wifi-node { background: #222; border-left: 4px solid var(--neon); padding: 15px; margin-bottom: 15px; display: grid; grid-template-columns: 1fr; gap: 10px; position: relative; border-radius: 0 8px 8px 0; }
         input { background: #000; border: 1px solid #444; color: var(--neon); padding: 12px; border-radius: 4px; width: 100%; box-sizing: border-box; font-family: 'Consolas', monospace; }
         button { cursor: pointer; padding: 12px 20px; border: none; border-radius: 4px; font-weight: bold; transition: all 0.2s; font-family: 'Consolas', monospace; text-transform: uppercase; }
@@ -21,16 +21,15 @@
         .btn-danger { background: #ff4444; color: #fff; padding: 5px 10px; font-size: 10px; position: absolute; top: 10px; right: 10px; border-radius: 3px; }
         label { color: #888; font-size: 10px; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1.5px; }
         h2 { margin-top: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 20px; letter-spacing: 1px; }
-        
-        /* Security & UI Utilities */
         #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
         #setup-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; display: flex; align-items: center; justify-content: center; }
         .overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.95); }
-        .modal { position: relative; width: 320px; background: var(--card); border: 2px solid var(--neon); padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 0 50px rgba(0, 255, 65, 0.2); }
+        .modal { position: relative; width: 320px; background: var(--card); border: 2px solid var(--neon); padding: 30px; border-radius: 15px; text-align: center; }
         .pass-container { position: relative; }
         .toggle-pass { position: absolute; right: 10px; bottom: 8px; cursor: pointer; font-size: 10px; color: var(--neon); background: #333; border: 1px solid #444; padding: 4px 8px; border-radius: 3px; }
         .status-toast { background: rgba(0, 255, 65, 0.1); border: 1px solid var(--neon); padding: 12px; margin-bottom: 20px; border-radius: 8px; font-size: 13px; text-align: center; }
         .hidden { display: none !important; }
+        .err-text { color: #ff4444 !important; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -39,40 +38,35 @@
     <div class="overlay"></div>
     <div class="modal">
         <h2 style="color:var(--neon)">🚀 FIRST RUN</h2>
-        <p style="font-size:12px; color:#ccc;">Default key: <b style="color:#fff">admin123</b></p>
-        <p style="font-size:11px; margin-bottom:20px;">Set a custom key for this app or leave blank for no password.</p>
+        <p style="font-size:12px; color:#ccc;">Set an app key or leave blank for none.</p>
         <input type="text" id="new-pwa-pass" placeholder="New Password..." style="margin-bottom:15px; text-align: center;">
-        <button class="btn-upload" onclick="finalizeSetup()">INITIALIZE MANAGER</button>
+        <button class="btn-upload" onclick="finalizeSetup()">INITIALIZE</button>
     </div>
 </div>
 
 <div id="lock-screen" class="hidden">
-    <h2 style="letter-spacing: 3px;">🔐 LOCKED</h2>
+    <h2>🔐 LOCKED</h2>
     <input type="password" id="pwa-pass" placeholder="Enter Key" style="width: 260px; text-align: center; margin-bottom: 15px; font-size: 18px;">
-    <button class="btn-upload" style="width: 260px;" onclick="unlockPWA()">UNLOCK SYSTEM</button>
+    <button class="btn-upload" style="width: 260px;" onclick="unlockPWA()">UNLOCK</button>
 </div>
 
 <div class="container">
-    <header style="text-align: center; margin-bottom: 30px; margin-top: 20px;">
+    <header style="text-align: center; margin: 20px 0 30px 0;">
         <h1 style="margin:0; font-size: 24px; color: #fff;">CROSSPOINT</h1>
-        <p style="margin:0; color: var(--neon); font-size: 12px; letter-spacing: 4px;">CONNECTION MANAGER</p>
+        <p style="margin:0; color: var(--neon); font-size: 11px; letter-spacing: 3px;">CONNECTION MANAGER</p>
     </header>
 
     <div id="load-msg" class="status-toast hidden">📡 CONNECTION DATA RESTORED</div>
 
     <div class="card">
         <h2>🔗 TARGET DEVICE</h2>
-        <div style="margin-bottom:15px;">
-            <label>Device IP or Hostname</label>
-            <input type="text" id="deviceIP" value="crosspoint.local" placeholder="e.g. 192.168.1.50">
-        </div>
+        <label>Device IP or Hostname</label>
+        <input type="text" id="deviceIP" value="crosspoint.local" style="margin-bottom:15px;">
         <div id="terminal" class="log-stream">SYSTEM_IDLE...</div>
     </div>
 
     <div class="card">
         <h2>📶 WIFI PROFILES</h2>
-        <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Import an existing wifi.bin or add profiles manually. Profiles are saved locally to this app.</p>
-        
         <label>Import wifi.bin</label>
         <input type="file" id="wifiIn" onchange="readWifiFile()" style="margin-bottom:20px; padding: 5px; border: 1px dashed #555;">
         
@@ -82,7 +76,7 @@
         
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
             <button class="btn-download" onclick="exportWifi(true)">💾 SAVE BIN</button>
-            <button class="btn-upload" style="margin-top:0;" onclick="uploadFile('wifi')">🚀 PUSH TO DEVICE</button>
+            <button class="btn-upload" style="margin-top:0;" onclick="uploadFile()">🚀 PUSH TO DEVICE</button>
         </div>
     </div>
 </div>
@@ -92,7 +86,52 @@
     let idleTimer;
     const IDLE_TIMEOUT = 5 * 60 * 1000;
 
-    // --- SECURITY & SESSION ---
+    function print(msg, isError = false) {
+        const t = document.getElementById('terminal');
+        const span = isError ? `<span class="err-text">> ${msg}</span>` : `> ${msg}`;
+        t.innerHTML += `${span}<br>`;
+        t.scrollTop = t.scrollHeight;
+    }
+
+    // --- PERSISTENCE ---
+    function saveWifiToLocal() {
+        const rows = document.querySelectorAll('.wifi-node');
+        if (rows.length === 0) {
+            localStorage.removeItem('cached_wifi_bin');
+            return;
+        }
+        const blob = exportWifi(false);
+        const reader = new FileReader();
+        reader.onload = function() {
+            const base64 = reader.result.split(',')[1];
+            localStorage.setItem('cached_wifi_bin', base64);
+            console.log("Auto-saved to LocalStorage");
+        };
+        reader.readAsDataURL(blob);
+    }
+
+    async function loadWifiFromLocal() {
+        const cachedData = localStorage.getItem('cached_wifi_bin');
+        if (!cachedData) {
+            print("STORAGE_EMPTY: No profiles found in memory.", true);
+            return;
+        }
+        try {
+            const binaryString = atob(cachedData);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+            
+            if (parseWifiBinary(bytes)) {
+                document.getElementById('load-msg').classList.remove('hidden');
+                setTimeout(() => document.getElementById('load-msg').classList.add('hidden'), 4000);
+                print("RESTORED: Profiles loaded from browser storage.");
+            }
+        } catch (e) {
+            print("ERROR: Could not parse stored data.", true);
+        }
+    }
+
+    // --- SECURITY ---
     window.addEventListener('DOMContentLoaded', () => {
         if (localStorage.getItem('pwa_setup_complete') === null) {
             document.getElementById('setup-container').classList.remove('hidden');
@@ -111,22 +150,15 @@
 
     function checkSecurity() {
         const savedPass = localStorage.getItem('pwa_pass_key');
-        if (savedPass === "" || savedPass === null) {
-            unlockSuccess();
-        } else {
-            document.getElementById('lock-screen').classList.remove('hidden');
-        }
+        if (!savedPass) unlockSuccess();
+        else document.getElementById('lock-screen').classList.remove('hidden');
     }
 
     function unlockPWA() {
         const input = document.getElementById('pwa-pass').value;
         const savedPass = localStorage.getItem('pwa_pass_key') || "admin123";
-        if (input === savedPass) {
-            unlockSuccess();
-        } else { 
-            print("ERROR: INVALID ACCESS KEY");
-            alert("ACCESS DENIED"); 
-        }
+        if (input === savedPass) unlockSuccess();
+        else { print("INVALID_KEY: Access denied.", true); alert("DENIED"); }
     }
 
     function unlockSuccess() {
@@ -140,42 +172,11 @@
         clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
             document.getElementById('lock-screen').classList.remove('hidden');
-            document.getElementById('pwa-pass').value = "";
-            print("SESSION_EXPIRED: AUTO-LOCKED");
+            print("SESSION_EXPIRED: Locked for security.");
         }, IDLE_TIMEOUT);
     }
 
-    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
-        window.addEventListener(evt, resetIdleTimer, false);
-    });
-
-    // --- CORE LOGIC ---
-    function print(msg) {
-        const t = document.getElementById('terminal');
-        t.innerHTML += `> ${msg}<br>`;
-        t.scrollTop = t.scrollHeight;
-    }
-
-    function saveWifiToLocal() {
-        const blob = exportWifi(false);
-        const reader = new FileReader();
-        reader.onload = function() {
-            localStorage.setItem('cached_wifi_bin', reader.result.split(',')[1]);
-        };
-        reader.readAsDataURL(blob);
-    }
-
-    async function loadWifiFromLocal() {
-        const cachedData = localStorage.getItem('cached_wifi_bin');
-        if (!cachedData) return;
-        const binaryString = atob(cachedData);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-        parseWifiBinary(bytes);
-        document.getElementById('load-msg').classList.remove('hidden');
-        setTimeout(() => document.getElementById('load-msg').classList.add('hidden'), 4000);
-    }
-
+    // --- WIFI LOGIC ---
     function toggleVisibility(btn, inputId) {
         const input = document.getElementById(inputId);
         input.type = (input.type === "password") ? "text" : "password";
@@ -202,36 +203,34 @@
         const file = document.getElementById('wifiIn').files[0];
         if (!file) return;
         const data = new Uint8Array(await file.arrayBuffer());
-        parseWifiBinary(data);
-        saveWifiToLocal();
-        print(`IMPORTED: ${file.name}`);
-    }
-
-    function parseWifiBinary(data) {
-        if (data[0] !== 1) { print("ERROR: INVALID BIN FORMAT"); return; }
-        document.getElementById('entryList').innerHTML = '';
-        let ptr = 2; 
-        for (let i = 0; i < data[1]; i++) {
-            const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-            const ssid = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + sLen));
-            ptr += 4 + sLen;
-            const pLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-            const pass = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + pLen).map((b, j) => b ^ WIFI_KEY[j % 10]));
-            ptr += 4 + pLen;
-            addNewWifi(ssid, pass);
+        if (parseWifiBinary(data)) {
+            print(`SUCCESS: Imported ${file.name}`);
+            saveWifiToLocal(); 
         }
     }
 
-    function exportWifi(dl) {
-        const rows = document.querySelectorAll('.wifi-node');
-        const out = [1, rows.length];
-        rows.forEach(row => {
-            const s = new TextEncoder().encode(row.querySelector('.ssid').value);
-            const p = new TextEncoder().encode(row.querySelector('.pass').value);
-            [s.length, 0, 0, 0].forEach(b => out.push(b)); s.forEach(b => out.push(b));
-            [p.length, 0, 0, 0].forEach(b => out.push(b)); p.forEach((b, i) => out.push(b ^ WIFI_KEY[i % 10]));
-        });
-        const blob = new Blob([new Uint8Array(out)], { type: 'application/octet-stream' });
-        if (dl) {
-            const a = document.createElement('a');
-            a.href = URL.create
+    function parseWifiBinary(data) {
+        if (data.length < 2 || data[0] !== 1) { 
+            print("ERROR: Invalid wifi.bin header.", true); 
+            return false; 
+        }
+        document.getElementById('entryList').innerHTML = '';
+        let ptr = 2; 
+        try {
+            for (let i = 0; i < data[1]; i++) {
+                const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
+                const ssid = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + sLen));
+                ptr += 4 + sLen;
+                const pLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
+                const pass = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + pLen).map((b, j) => b ^ WIFI_KEY[j % 10]));
+                ptr += 4 + pLen;
+                addNewWifi(ssid, pass);
+            }
+            return true;
+        } catch (err) {
+            print("ERROR: Binary structure mismatch.", true);
+            return false;
+        }
+    }
+
+    function exportWifi(
