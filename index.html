@@ -11,7 +11,7 @@
         body { font-family: 'Consolas', monospace; background: var(--bg); color: var(--neon); padding: 20px; line-height: 1.4; margin: 0; }
         .container { max-width: 600px; margin: 0 auto; }
         .card { background: var(--card); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 20px; }
-        .log-stream { background: #000; color: #008f11; padding: 12px; font-size: 11px; height: 100px; overflow-y: auto; border: 1px solid #222; margin-bottom: 20px; border-radius: 4px; border-left: 3px solid #444; }
+        .log-stream { background: #000; color: #008f11; padding: 12px; font-size: 11px; height: 120px; overflow-y: auto; border: 1px solid #222; margin-bottom: 20px; border-radius: 4px; border-left: 3px solid #444; white-space: pre-wrap; }
         .wifi-node { background: #222; border-left: 4px solid var(--neon); padding: 15px; margin-bottom: 15px; display: grid; grid-template-columns: 1fr; gap: 10px; position: relative; border-radius: 0 8px 8px 0; }
         input { background: #000; border: 1px solid #444; color: var(--neon); padding: 12px; border-radius: 4px; width: 100%; box-sizing: border-box; font-family: 'Consolas', monospace; }
         button { cursor: pointer; padding: 12px 20px; border: none; border-radius: 4px; font-weight: bold; transition: all 0.2s; font-family: 'Consolas', monospace; text-transform: uppercase; }
@@ -21,7 +21,6 @@
         .btn-danger { background: #ff4444; color: #fff; padding: 5px 10px; font-size: 10px; position: absolute; top: 10px; right: 10px; border-radius: 3px; }
         label { color: #888; font-size: 10px; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1.5px; }
         h2 { margin-top: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 20px; letter-spacing: 1px; }
-        
         #lock-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
         #setup-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; display: flex; align-items: center; justify-content: center; }
         .overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.95); }
@@ -40,8 +39,8 @@
     <div class="overlay"></div>
     <div class="modal">
         <h2 style="color:var(--neon)">🚀 FIRST RUN</h2>
-        <p style="font-size:12px; color:#ccc;">The default key is <b>admin123</b>.</p>
-        <input type="text" id="new-pwa-pass" placeholder="Set Custom Password..." style="margin-bottom:15px; text-align: center;">
+        <p style="font-size:12px; color:#ccc;">Point to <b>wifi.bin</b> to begin.</p>
+        <input type="text" id="new-pwa-pass" placeholder="Set App Key (Optional)..." style="margin-bottom:15px; text-align: center;">
         <button class="btn-upload" onclick="finalizeSetup()">INITIALIZE</button>
     </div>
 </div>
@@ -64,121 +63,109 @@
         <h2>🔗 TARGET DEVICE</h2>
         <label>Device IP or Hostname</label>
         <input type="text" id="deviceIP" value="crosspoint.local" style="margin-bottom:15px;">
-        <div id="terminal" class="log-stream">SYSTEM_IDLE...</div>
+        <div id="terminal" class="log-stream">SYSTEM READY...</div>
     </div>
 
     <div class="card">
         <h2>📶 WIFI PROFILES</h2>
         <label>Import wifi.bin</label>
         <input type="file" id="wifiIn" onchange="readWifiFile()" style="margin-bottom:20px; padding: 5px; border: 1px dashed #555;">
-        
         <div id="entryList"></div>
-        
         <button onclick="addNewWifi('', '')" style="background:#333; color:var(--neon); width:100%; margin-bottom:15px; border: 1px solid #444;">+ ADD NEW NETWORK</button>
-        
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
             <button class="btn-download" onclick="exportWifi(true)">💾 SAVE BIN</button>
             <button class="btn-upload" style="margin-top:0;" onclick="uploadFile()">🚀 PUSH TO DEVICE</button>
         </div>
     </div>
-
-    <div class="build-info">BUILD_WORD: NEBULA</div>
+    <div class="build-info">BUILD_WORD: ORBIT</div>
 </div>
 
 <script>
-    const WIFI_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74]; // "CrossPoint"
+    // Exact key from your WifiCredentialStore.cpp
+    const OBFUSCATION_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74];
     let idleTimer;
     const IDLE_TIMEOUT = 5 * 60 * 1000;
 
     function print(msg, isError = false) {
         const t = document.getElementById('terminal');
-        const content = isError ? `<span class="err-text">> ERROR: ${msg}</span>` : `> ${msg}`;
-        t.innerHTML += `${content}<br>`;
+        const content = isError ? `<span class="err-text">> ERR: ${msg}</span>` : `> ${msg}`;
+        t.innerHTML += `${content}\n`;
         t.scrollTop = t.scrollHeight;
     }
 
-    // --- PERSISTENCE ---
     function saveWifiToLocal() {
         const blob = exportWifi(false);
         const reader = new FileReader();
         reader.onload = function() {
-            const base64 = reader.result.split(',')[1];
-            localStorage.setItem('cached_wifi_bin', base64);
+            localStorage.setItem('cached_wifi_bin', reader.result.split(',')[1]);
         };
         reader.readAsDataURL(blob);
     }
 
     async function loadWifiFromLocal() {
         const cachedData = localStorage.getItem('cached_wifi_bin');
-        if (!cachedData) {
-            print("STORAGE_EMPTY: Ready for new data.");
-            return;
-        }
+        if (!cachedData) return;
         try {
             const binaryString = atob(cachedData);
             const bytes = new Uint8Array(binaryString.length);
             for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-            
-            if (parseWifiBinary(bytes)) {
-                document.getElementById('load-msg').classList.remove('hidden');
-                setTimeout(() => document.getElementById('load-msg').classList.add('hidden'), 4000);
-                print("RESTORED: Previous session data loaded.");
-            }
-        } catch (e) {
-            print("RESTORE_FAILED: Storage corrupted.", true);
-        }
+            parseWifiBinary(bytes);
+        } catch (e) { print("LOCAL_STORAGE_CORRUPT", true); }
     }
 
-    // --- SECURITY ---
     window.addEventListener('DOMContentLoaded', () => {
         if (localStorage.getItem('pwa_setup_complete') === null) {
             document.getElementById('setup-container').classList.remove('hidden');
-        } else {
-            checkSecurity();
-        }
+        } else { checkSecurity(); }
     });
 
     function finalizeSetup() {
-        const newPass = document.getElementById('new-pwa-pass').value;
-        localStorage.setItem('pwa_pass_key', newPass);
+        localStorage.setItem('pwa_pass_key', document.getElementById('new-pwa-pass').value);
         localStorage.setItem('pwa_setup_complete', 'true');
         document.getElementById('setup-container').classList.add('hidden');
         checkSecurity();
     }
 
     function checkSecurity() {
-        const savedPass = localStorage.getItem('pwa_pass_key');
-        if (savedPass === "" || savedPass === null) unlockSuccess();
+        const p = localStorage.getItem('pwa_pass_key');
+        if (!p) unlockSuccess();
         else document.getElementById('lock-screen').classList.remove('hidden');
     }
 
     function unlockPWA() {
-        const input = document.getElementById('pwa-pass').value;
-        const savedPass = localStorage.getItem('pwa_pass_key') || "admin123";
-        if (input === savedPass) unlockSuccess();
-        else { print("ACCESS_DENIED", true); alert("DENIED"); }
+        if (document.getElementById('pwa-pass').value === (localStorage.getItem('pwa_pass_key') || "admin123")) unlockSuccess();
+        else print("AUTH_FAILED", true);
     }
 
     function unlockSuccess() {
         document.getElementById('lock-screen').classList.add('hidden');
         loadWifiFromLocal();
-        resetIdleTimer();
     }
 
-    function resetIdleTimer() {
-        if (!localStorage.getItem('pwa_pass_key')) return;
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-            document.getElementById('lock-screen').classList.remove('hidden');
-            print("SESSION_EXPIRED: UI Locked.");
-        }, IDLE_TIMEOUT);
+    function addNewWifi(ssid, pass) {
+        const id = "pass_" + Math.random().toString(36).substr(2, 9);
+        const div = document.createElement('div');
+        div.className = 'wifi-node';
+        div.innerHTML = `
+            <button class="btn-danger" onclick="this.parentElement.remove(); saveWifiToLocal();">REMOVE</button>
+            <div><label>Network SSID</label><input type="text" class="ssid" oninput="saveWifiToLocal()" value="${ssid}"></div>
+            <div class="pass-container">
+                <label>Password</label>
+                <input type="password" id="${id}" class="pass" oninput="saveWifiToLocal()" value="${pass}">
+                <button class="toggle-pass" onclick="toggleVisibility(this, '${id}')">SHOW</button>
+            </div>`;
+        document.getElementById('entryList').appendChild(div);
     }
 
-    // --- WIFI PARSING & LOGIC ---
     function toggleVisibility(btn, inputId) {
         const input = document.getElementById(inputId);
         input.type = (input.type === "password") ? "text" : "password";
         btn.innerText = (input.type === "password") ? "SHOW" : "HIDE";
     }
 
-    function addNewWifi(ssid, pass) {
+    async function readWifiFile() {
+        const file = document.getElementById('wifiIn').files[0];
+        if (!file) return;
+        print(`OPENING: ${file.name} (${file.size} bytes)`);
+        const data = new Uint8Array(await file.arrayBuffer());
+        if (parseWifiBinary(data)) {
