@@ -2,171 +2,183 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>CrossPoint | WiFi & Remote Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrossPoint | WiFi Manager</title>
     <style>
-        :root { --neon: #00ff41; --bg: #0d0d0d; --card: #1a1a1a; --border: #333; }
-        body { font-family: 'Consolas', monospace; background: var(--bg); color: var(--neon); padding: 20px; line-height: 1.4; }
-        .container { max-width: 700px; margin: 0 auto; }
-        .card { background: var(--card); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 20px; }
-        .remote-panel { background: #000; border: 1px solid #444; padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; border-radius: 8px; }
-        .log-stream { background: #000; color: #008f11; padding: 12px; font-size: 11px; height: 100px; overflow-y: auto; border: 1px solid #222; margin-bottom: 20px; border-radius: 4px; border-left: 3px solid #444; }
-        .wifi-node { background: #222; border-left: 4px solid var(--neon); padding: 15px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr 80px 45px; gap: 10px; align-items: end; border-radius: 0 8px 8px 0; }
-        input { background: #000; border: 1px solid #444; color: var(--neon); padding: 10px; border-radius: 4px; width: 100%; box-sizing: border-box; font-family: 'Consolas', monospace; }
-        button { cursor: pointer; padding: 10px 15px; border: none; border-radius: 4px; font-weight: bold; transition: opacity 0.2s; font-family: 'Consolas', monospace; }
-        button:hover { opacity: 0.8; }
-        .btn-upload { background: var(--neon); color: #000; }
-        .btn-download { background: #fff; color: #000; }
-        .btn-danger { background: #600; color: #fff; }
-        .btn-toggle { background: #333; color: var(--neon); border: 1px solid #444; font-size: 10px; }
-        label { color: #888; font-size: 10px; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
-        h2 { margin-top: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 18px; letter-spacing: 2px; }
+        :root {
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --text-main: #121212;
+            --text-muted: #6c757d;
+            --border: #e0e0e0;
+            --accent: #000000;
+            --shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        * { box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container { width: 100%; max-width: 600px; }
+
+        /* HEADER SECTION */
+        header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 10px 0;
+        }
+        .logo-img {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            margin-right: 15px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+        .header-text h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .header-text p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* CARD STYLING */
+        .card { 
+            background: var(--surface); 
+            border: 1px solid var(--border); 
+            padding: 25px; 
+            border-radius: 12px; 
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        
+        h2 { 
+            margin-top: 0; 
+            font-size: 13px; 
+            color: var(--text-muted); 
+            text-transform: uppercase; 
+            letter-spacing: 1.5px; 
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+
+        /* LOG / TERMINAL */
+        .log-stream { 
+            background: #fafafa; 
+            color: #444; 
+            padding: 12px; 
+            font-size: 11px; 
+            height: 80px; 
+            overflow-y: auto; 
+            border: 1px solid var(--border); 
+            border-radius: 6px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+
+        /* WIFI ENTRY STYLING */
+        .wifi-node { 
+            background: #ffffff; 
+            border: 1px solid var(--border);
+            padding: 15px; 
+            margin-bottom: 12px; 
+            display: grid; 
+            grid-template-columns: 1fr 1fr auto auto; 
+            gap: 12px; 
+            align-items: end; 
+            border-radius: 8px;
+            transition: transform 0.1s ease;
+        }
+        .wifi-node:hover { border-color: #bbb; }
+
+        /* FORMS */
+        label { 
+            color: var(--text-muted); 
+            font-size: 10px; 
+            font-weight: 700;
+            display: block; 
+            margin-bottom: 6px; 
+            text-transform: uppercase; 
+        }
+        input { 
+            background: #fff; 
+            border: 1px solid #ccc; 
+            color: var(--text-main); 
+            padding: 10px; 
+            border-radius: 6px; 
+            width: 100%; 
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: var(--accent); outline: none; }
+
+        /* BUTTONS */
+        button { 
+            cursor: pointer; 
+            padding: 12px 18px; 
+            border: 1px solid var(--accent); 
+            border-radius: 6px; 
+            font-weight: 700; 
+            font-size: 12px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-add { background: #fff; color: var(--accent); width: 100%; margin-bottom: 15px; border-style: dashed; }
+        .btn-add:hover { background: #f0f0f0; }
+        .btn-upload { background: var(--accent); color: #fff; }
+        .btn-download { background: #fff; color: var(--accent); }
+        .btn-danger { background: #fff; color: #d93025; border-color: #f8d7da; }
+        .btn-danger:hover { background: #f8d7da; }
+        .btn-toggle { background: transparent; border: none; color: var(--text-muted); text-decoration: underline; font-size: 9px; width: 40px;}
+
+        /* MOBILE OPTIMIZATION */
+        @media (max-width: 500px) {
+            .wifi-node { grid-template-columns: 1fr; }
+            .btn-group { flex-direction: column; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="card">
-        <h2>📡 DEVICE CONNECTION</h2>
-        <div class="remote-panel">
-            <div style="flex-grow: 1;">
-                <label>Target Hostname / IP</label>
-                <input type="text" id="deviceIP" value="crosspoint.local">
-            </div>
+    <header>
+        <img src="https://opengraph.githubassets.com/734bcdd85adbf1745cc62707e69d0667bd00a57b7218877a5c36215884250408/crosspoint-reader/crosspoint-reader" alt="Logo" class="logo-img">
+        <div class="header-text">
+            <h1>CrossPoint</h1>
+            <p>System Connection Manager</p>
         </div>
-        <div id="terminal" class="log-stream">SYSTEM_READY...</div>
+    </header>
+
+    <div class="card">
+        <h2>📡 Device Status</h2>
+        <div style="margin-bottom:15px;">
+            <label>Target Hostname / IP</label>
+            <input type="text" id="deviceIP" value="crosspoint.local">
+        </div>
+        <div id="terminal" class="log-stream">READY_TO_CONNECT</div>
     </div>
 
     <div class="card">
-        <h2>🌐 WIFI PROFILES (wifi.bin)</h2>
-        <label>Import Local File</label>
-        <input type="file" id="wifiIn" onchange="readWifiFile()" style="margin-bottom:20px; font-size: 12px;">
-        
-        <div id="entryList"></div>
-        
-        <button onclick="addNewWifi('', '')" style="background:#333; color:var(--neon); border: 1px solid #444; width:100%; margin-bottom:15px;">+ ADD NEW NETWORK</button>
-        
-        <div style="display:flex; gap:10px;">
-            <button class="btn-download" onclick="exportWifi(true)">💾 DOWNLOAD BIN</button>
-            <button class="btn-upload" style="flex-grow:1" onclick="uploadFile()">🚀 UPLOAD TO DEVICE</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    const WIFI_KEY = [0x43, 0x72, 0x6F, 0x73, 0x73, 0x50, 0x6F, 0x69, 0x6E, 0x74];
-
-    function print(msg) {
-        const t = document.getElementById('terminal');
-        t.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
-        t.scrollTop = t.scrollHeight;
-    }
-
-    // --- PERSISTENCE LOGIC ---
-    function saveToLocalStorage() {
-        const data = [];
-        document.querySelectorAll('.wifi-node').forEach(row => {
-            data.push({
-                s: row.querySelector('.ssid').value,
-                p: row.querySelector('.pass').value
-            });
-        });
-        localStorage.setItem('cp_wifi_cache', JSON.stringify(data));
-    }
-
-    function loadFromLocalStorage() {
-        const cache = localStorage.getItem('cp_wifi_cache');
-        if (cache) {
-            const data = JSON.parse(cache);
-            data.forEach(item => addNewWifi(item.s, item.p));
-            print("DATA_RESTORED: Loaded from browser storage.");
-        }
-    }
-
-    // --- WIFI BINARY LOGIC ---
-    async function readWifiFile() {
-        const file = document.getElementById('wifiIn').files[0];
-        if (!file) return;
-        const data = new Uint8Array(await file.arrayBuffer());
-        document.getElementById('entryList').innerHTML = '';
-        let ptr = 2; 
-        for (let i = 0; i < data[1]; i++) {
-            const sLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-            const ssid = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + sLen));
-            ptr += 4 + sLen;
-            const pLen = data[ptr] | (data[ptr+1] << 8) | (data[ptr+2] << 16) | (data[ptr+3] << 24);
-            const pass = new TextDecoder().decode(data.slice(ptr + 4, ptr + 4 + pLen).map((b, j) => b ^ WIFI_KEY[j % 10]));
-            ptr += 4 + pLen;
-            addNewWifi(ssid, pass);
-        }
-        print(`IMPORTED: ${file.name}`);
-        saveToLocalStorage();
-    }
-
-    function addNewWifi(s, p) {
-        const id = "pass_" + Math.random().toString(36).substr(2, 9);
-        const div = document.createElement('div');
-        div.className = 'wifi-node';
-        div.innerHTML = `
-            <div><label>SSID</label><input type="text" class="ssid" value="${s}" oninput="saveToLocalStorage()"></div>
-            <div><label>Pass</label><input type="password" id="${id}" class="pass" value="${p}" oninput="saveToLocalStorage()"></div>
-            <button class="btn-toggle" onclick="togglePass('${id}')">SHOW</button>
-            <button class="btn-danger" onclick="this.parentElement.remove(); saveToLocalStorage();">X</button>`;
-        document.getElementById('entryList').appendChild(div);
-        saveToLocalStorage();
-    }
-
-    function togglePass(id) {
-        const input = document.getElementById(id);
-        const btn = input.parentElement.nextElementSibling;
-        if (input.type === "password") {
-            input.type = "text";
-            btn.innerText = "HIDE";
-        } else {
-            input.type = "password";
-            btn.innerText = "SHOW";
-        }
-    }
-
-    function exportWifi(dl) {
-        const rows = document.querySelectorAll('.wifi-node');
-        const out = [1, rows.length];
-        rows.forEach(row => {
-            const s = new TextEncoder().encode(row.querySelector('.ssid').value);
-            const p = new TextEncoder().encode(row.querySelector('.pass').value);
-            [s.length, 0, 0, 0].forEach(b => out.push(b)); s.forEach(b => out.push(b));
-            [p.length, 0, 0, 0].forEach(b => out.push(b)); p.forEach((b, i) => out.push(b ^ WIFI_KEY[i % 10]));
-        });
-        const blob = new Blob([new Uint8Array(out)], { type: 'application/octet-stream' });
-        if (dl) triggerDownload(blob, 'wifi.bin');
-        return blob;
-    }
-
-    function triggerDownload(blob, name) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = name; a.click();
-    }
-
-    async function uploadFile() {
-        const host = document.getElementById('deviceIP').value;
-        const blob = exportWifi(false);
-        const formData = new FormData();
-        formData.append('file', blob, 'wifi.bin');
-        print(`CONNECTING: ${host}...`);
-        try {
-            await fetch(`http://${host}/upload?path=/.crosspoint/`, { 
-                method: 'POST', 
-                body: formData, 
-                mode: 'no-cors' 
-            });
-            print(`TRANSMITTED: wifi.bin sent successfully.`);
-        } catch (err) { 
-            print(`ERROR: Device unreachable.`); 
-        }
-    }
-
-    // Auto-load on page start
-    window.onload = loadFromLocalStorage;
-</script>
-</body>
-</html>
+        <h2>🌐 WiFi Profiles</h2>
+        <div style="margin-bottom: 20px;">
+            <label>Import Configuration</label>
+            <input type="file" id="wifiIn" onchange="readWifiFile()" style="font-size: 11px; padding: 5px; border: 1px dashed #ccc
